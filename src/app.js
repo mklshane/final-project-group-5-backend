@@ -5,7 +5,6 @@ import { errorHandler } from "./middleware/errorHandler.js";
 
 import syncRoutes from "./routes/sync.routes.js";
 import profileRoutes from "./routes/profile.routes.js";
-import adminRoutes from "./routes/admin.routes.js";
 
 const app = express();
 
@@ -26,7 +25,6 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/sync", syncRoutes);
 app.use("/api/profile", profileRoutes);
-app.use("/api/admin", adminRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
