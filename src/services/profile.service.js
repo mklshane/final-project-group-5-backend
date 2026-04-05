@@ -29,7 +29,6 @@ export class ProfileService {
     const { data, error } = await supabase
       .from("profiles")
       .update({
-        full_name: input.full_name,
         currency: input.currency,
         balance: input.balance,
         onboarding_done: true,
