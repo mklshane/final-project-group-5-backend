@@ -1,7 +1,7 @@
 import { env } from "../config/env.js";
 import { AppError } from "../utils/errors.js";
 
-const GEMINI_MODEL = "gemini-1.5-flash";
+const MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"];
 
 const PROMPT = [
   "You are parsing a receipt image for a budgeting app.",
@@ -119,36 +119,61 @@ export const receiptService = {
       throw new AppError("Receipt parsing is not configured on server", 503, "RECEIPT_PARSER_DISABLED");
     }
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
+    const modelCandidates = [env.GEMINI_MODEL, ...MODELS].filter(
+      (model, index, list) => model && list.indexOf(model) === index
+    );
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: PROMPT },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: imageBase64,
+    let payload = null;
+    let lastUpstreamError = null;
+
+    for (const model of modelCandidates) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: PROMPT },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: imageBase64,
+                  },
                 },
-              },
-            ],
-          },
-        ],
-      }),
-    });
+              ],
+            },
+          ],
+        }),
+      });
 
-    if (!response.ok) {
+      if (response.ok) {
+        payload = await response.json();
+        break;
+      }
+
       const body = await response.text();
-      throw new AppError(`Gemini request failed (${response.status}): ${body}`, 502, "RECEIPT_PARSER_UPSTREAM_ERROR");
+      lastUpstreamError = `Gemini request failed (${response.status}) for model ${model}: ${body}`;
+
+      // Try next candidate if this model does not exist for generateContent.
+      if (response.status === 404) {
+        continue;
+      }
+
+      throw new AppError(lastUpstreamError, 502, "RECEIPT_PARSER_UPSTREAM_ERROR");
     }
 
-    const payload = await response.json();
+    if (!payload) {
+      throw new AppError(
+        lastUpstreamError || "Gemini request failed for all configured models",
+        502,
+        "RECEIPT_PARSER_UPSTREAM_ERROR"
+      );
+    }
+
     const rawModelText =
       payload?.candidates?.[0]?.content?.parts
         ?.map((part) => (typeof part?.text === "string" ? part.text : ""))

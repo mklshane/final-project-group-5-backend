@@ -5,6 +5,7 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SUPABASE_ANON_KEY: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1).optional(),
+  GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
   PORT: z.string().default("3000"),
   NODE_ENV: z.enum(["development", "staging", "production"]).default("development"),
   CORS_ORIGIN: z.string().default("*"),
