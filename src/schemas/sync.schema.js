@@ -4,7 +4,7 @@ import { SYNCED_TABLES, MAX_SYNC_BATCH_SIZE } from "../utils/constants.js";
 const syncChangeSchema = z.object({
   table: z.enum(SYNCED_TABLES),
   action: z.enum(["create", "update", "delete"]),
-  record: z.record(z.unknown()).optional(),
+  record: z.record(z.string(), z.unknown()).optional(),
   record_id: z.string().uuid().optional(),
   version: z.number().int().min(1),
 }).refine(
