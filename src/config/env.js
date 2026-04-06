@@ -4,6 +4,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SUPABASE_ANON_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().min(1).optional(),
   PORT: z.string().default("3000"),
   NODE_ENV: z.enum(["development", "staging", "production"]).default("development"),
   CORS_ORIGIN: z.string().default("*"),

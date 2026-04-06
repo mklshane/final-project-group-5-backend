@@ -5,6 +5,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 
 import syncRoutes from "./routes/sync.routes.js";
 import profileRoutes from "./routes/profile.routes.js";
+import receiptRoutes from "./routes/receipt.routes.js";
 
 const app = express();
 
@@ -12,7 +13,7 @@ app.use(cors({
   origin: env.CORS_ORIGIN === "*" ? "*" : env.CORS_ORIGIN.split(","),
   credentials: true,
 }));
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "12mb" }));
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -25,6 +26,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/sync", syncRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/receipts", receiptRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
