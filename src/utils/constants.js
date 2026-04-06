@@ -2,6 +2,7 @@
 export const SYNCED_TABLES = [
   "transactions",
   "categories",
+  "wallets",
   "budgets",
   "goals",
   "debts",
