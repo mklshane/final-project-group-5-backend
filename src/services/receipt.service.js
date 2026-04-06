@@ -3,6 +3,17 @@ import { AppError } from "../utils/errors.js";
 
 const MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"];
 
+const parseRetrySeconds = (payload) => {
+  const retryInfo = payload?.error?.details?.find((detail) => detail?.["@type"]?.includes("RetryInfo"));
+  const retryDelay = retryInfo?.retryDelay;
+  if (typeof retryDelay !== "string") return null;
+
+  const match = retryDelay.match(/(\d+)/);
+  if (!match) return null;
+  const seconds = Number.parseInt(match[1], 10);
+  return Number.isFinite(seconds) ? seconds : null;
+};
+
 const PROMPT = [
   "You are parsing a receipt image for a budgeting app.",
   "Return only valid JSON with this exact shape:",
@@ -125,6 +136,8 @@ export const receiptService = {
 
     let payload = null;
     let lastUpstreamError = null;
+    let sawRateLimit = false;
+    let minRetrySeconds = null;
 
     for (const model of modelCandidates) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
@@ -155,15 +168,35 @@ export const receiptService = {
         break;
       }
 
-      const body = await response.text();
-      lastUpstreamError = `Gemini request failed (${response.status}) for model ${model}: ${body}`;
+      const bodyJson = await response.json().catch(() => null);
+      const bodyText = bodyJson ? JSON.stringify(bodyJson) : "Unknown upstream error";
+      lastUpstreamError = `Gemini request failed (${response.status}) for model ${model}: ${bodyText}`;
 
       // Try next candidate if this model does not exist for generateContent.
       if (response.status === 404) {
         continue;
       }
 
+      // Try next candidate model when current model quota is exhausted.
+      if (response.status === 429) {
+        sawRateLimit = true;
+        const retrySeconds = parseRetrySeconds(bodyJson);
+        if (retrySeconds !== null) {
+          minRetrySeconds = minRetrySeconds === null ? retrySeconds : Math.min(minRetrySeconds, retrySeconds);
+        }
+        continue;
+      }
+
       throw new AppError(lastUpstreamError, 502, "RECEIPT_PARSER_UPSTREAM_ERROR");
+    }
+
+    if (!payload && sawRateLimit) {
+      const retryHint = minRetrySeconds !== null ? ` Try again in about ${minRetrySeconds}s.` : "";
+      throw new AppError(
+        `Gemini quota exceeded for available models.${retryHint}`,
+        429,
+        "RECEIPT_PARSER_RATE_LIMITED"
+      );
     }
 
     if (!payload) {
