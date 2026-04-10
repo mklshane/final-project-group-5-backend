@@ -14,6 +14,7 @@ export class SyncService {
     const syncedAt = new Date().toISOString();
     const acknowledged = [];
     const conflicts = [];
+    const failedChanges = [];
 
     // 1. Process incoming changes from client
     for (const change of request.changes) {
@@ -29,6 +30,12 @@ export class SyncService {
           userId,
           table: change.table,
           action: change.action,
+          error: err.message,
+        });
+        failedChanges.push({
+          table: change.table,
+          action: change.action,
+          record_id: change.record_id || change.record?.id || null,
           error: err.message,
         });
         // Continue processing other changes — don't fail the whole batch
@@ -47,6 +54,7 @@ export class SyncService {
       pushed: request.changes.length,
       acknowledged: acknowledged.length,
       conflicts: conflicts.length,
+      failed: failedChanges.length,
       pulled: serverChanges.length,
       durationMs,
     });
@@ -55,6 +63,7 @@ export class SyncService {
       synced_at: syncedAt,
       acknowledged,
       conflicts,
+      failed_changes: failedChanges,
       server_changes: serverChanges,
     };
   }
